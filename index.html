@@ -9,22 +9,29 @@
         :root { --accent: #FFD700; --bg: #050505; }
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
         body { background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%); color: white; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        
         .container { width: 100%; max-width: 900px; margin-top: 20px; }
         #videoTitle { font-size: 1.5rem; margin-bottom: 20px; border-left: 4px solid var(--accent); padding-left: 15px; font-weight: 600; }
+        
         .video-box { position: relative; width: 100%; padding-bottom: 56.25%; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 0 40px rgba(0,0,0,0.8); border: 1px solid #333; }
         iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+        
         .controls { display: flex; gap: 15px; margin-top: 25px; }
         .btn { padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.3s; text-transform: uppercase; font-size: 0.9rem; }
         .btn-p1 { background: var(--accent); color: #000; }
         .btn-p2 { background: #222; color: #fff; border: 1px solid #444; }
         .btn-p2.unlocked { background: var(--accent); color: #000; border: none; }
 
-        /* Modal Middle */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal { background: #111; padding: 40px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #333; }
+        /* Modal Middle (Center) */
+        .modal-overlay { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); backdrop-filter: blur(10px); 
+            display: none; justify-content: center; align-items: center; z-index: 1000; 
+        }
+        .modal { background: #111; padding: 40px; border-radius: 20px; width: 90%; max-width: 400px; text-align: center; border: 1px solid #333; box-shadow: 0 0 50px rgba(0,0,0,1); }
         .modal h2 { color: var(--accent); margin-bottom: 15px; }
-        .modal p { color: #bbb; margin-bottom: 25px; font-size: 0.95rem; }
-        .m-btn { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; }
+        .modal p { color: #bbb; margin-bottom: 25px; font-size: 0.95rem; line-height: 1.5; }
+        .m-btn { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; text-transform: uppercase; }
         .m-verify { background: var(--accent); color: #000; margin-bottom: 12px; }
         .m-cancel { background: transparent; color: #555; font-size: 0.8rem; }
     </style>
@@ -32,7 +39,7 @@
 <body>
 
     <div class="container">
-        <h1 id="videoTitle">Premium Stream</h1>
+        <h1 id="videoTitle">Loading...</h1>
         <div class="video-box">
             <iframe id="mainFrame" src="" allowfullscreen></iframe>
         </div>
@@ -42,12 +49,13 @@
         </div>
     </div>
 
+    <!-- Centered Modal -->
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal">
-            <h2>Lock Full Episode</h2>
-            <p>Verification is required to watch the full episode. Please verify below.</p>
-            <button class="m-btn m-verify" id="startVerify">VERIFY NOW</button>
-            <button class="m-btn m-cancel" id="closeModal">NOT NOW</button>
+            <h2>Episode Locked</h2>
+            <p>Verification is required for this specific episode. Please complete verification to unlock.</p>
+            <button class="m-btn m-verify" id="startVerify">Verify to Unlock</button>
+            <button class="m-btn m-cancel" id="closeModal">Not Now</button>
         </div>
     </div>
 
@@ -74,8 +82,12 @@
         const overlay = document.getElementById('modalOverlay');
         let currentData = null;
 
-        // Function to create a clean lock-key from URL
-        const generateKey = (url) => 'lock_' + btoa(url).replace(/=/g, '').substring(0, 20);
+        // Logic: Link se unique ID nikalna (e.g. dTamJP7O)
+        const getUniqueId = (url) => {
+            if(!url) return 'none';
+            // URL ke characters ko hash karke unique ID banana
+            return btoa(url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+        };
 
         onValue(videoRef, (snapshot) => {
             currentData = snapshot.val();
@@ -83,26 +95,26 @@
 
             document.getElementById('videoTitle').innerText = currentData.title;
             
-            // Unique key for Full Episode only
-            const lockKey = generateKey(currentData.part2_url);
+            // Unique key sirf Full Episode URL ke liye
+            const uniqueKey = "unlocked_" + getUniqueId(currentData.part2_url);
             const urlParams = new URLSearchParams(window.location.search);
 
-            // 1. Check if returning from verification
+            // 1. Agar user verify karke aaya hai
             if (urlParams.get('verify') === 'true') {
-                localStorage.setItem(lockKey, 'true');
+                localStorage.setItem(uniqueKey, 'true');
+                // URL saaf karein taaki reload pe normal chale
+                window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // 2. Check if currently unlocked
-            const isUnlocked = localStorage.getItem(lockKey) === 'true';
+            // 2. Lock check karein
+            const isUnlocked = localStorage.getItem(uniqueKey) === 'true';
 
             if (isUnlocked) {
                 btnP2.innerHTML = "Full Episode";
                 btnP2.classList.add('unlocked');
-                
-                // If just verified, show Full Video, else show Preview
+                // Agar abhi abhi verify hua hai, toh Part 2 play karein, warna Preview
                 if (urlParams.get('verify') === 'true') {
                     frame.src = currentData.part2_url;
-                    window.history.replaceState({}, document.title, window.location.pathname);
                 } else {
                     frame.src = currentData.part1_url;
                 }
@@ -118,8 +130,8 @@
         };
         
         btnP2.onclick = () => {
-            const lockKey = generateKey(currentData.part2_url);
-            if (localStorage.getItem(lockKey) === 'true') {
+            const uniqueKey = "unlocked_" + getUniqueId(currentData.part2_url);
+            if (localStorage.getItem(uniqueKey) === 'true') {
                 frame.src = currentData.part2_url;
             } else {
                 overlay.style.display = 'flex';
